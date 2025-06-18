@@ -115,7 +115,16 @@ class GitHubIntegration(BaseIntegration):
             issues = []
             user_issues = self.github.search_issues(f"assignee:{self.user.login} is:open")
             
-            for issue in user_issues[:limit]:
+            # Check if there are any issues before iterating
+            if user_issues.totalCount == 0:
+                self._set_cache(cache_key, issues)
+                return issues
+            
+            for issue in list(user_issues)[:limit]:
+                # Handle potentially missing attributes safely
+                body = issue.body if hasattr(issue, 'body') and issue.body else ""
+                truncated_body = body[:200] + '...' if body and len(body) > 200 else body
+                
                 issue_data = {
                     'id': issue.id,
                     'number': issue.number,
@@ -126,9 +135,9 @@ class GitHubIntegration(BaseIntegration):
                     'created_at': issue.created_at.isoformat(),
                     'updated_at': issue.updated_at.isoformat(),
                     'url': issue.html_url,
-                    'labels': [label.name for label in issue.labels],
-                    'comments': issue.comments,
-                    'body': issue.body[:200] + '...' if issue.body and len(issue.body) > 200 else issue.body
+                    'labels': [label.name for label in issue.labels] if hasattr(issue, 'labels') else [],
+                    'comments': issue.comments if hasattr(issue, 'comments') else 0,
+                    'body': truncated_body
                 }
                 issues.append(issue_data)
             
@@ -161,9 +170,13 @@ class GitHubIntegration(BaseIntegration):
                         if commit_count >= limit:
                             break
                         
+                        # Get first line of commit message safely
+                        message_lines = commit.commit.message.split('\n') if commit.commit.message else ["No message"]
+                        first_line = message_lines[0] if message_lines else "No message"
+                        
                         commit_data = {
                             'sha': commit.sha[:8],  # Short SHA
-                            'message': commit.commit.message.split('\n')[0],  # First line only
+                            'message': first_line,  # First line only
                             'repository': repo.name,
                             'date': commit.commit.author.date.isoformat(),
                             'url': commit.html_url,
@@ -251,10 +264,19 @@ class GitHubIntegration(BaseIntegration):
             
             pr_issues = self.github.search_issues(search_query)
             
-            for issue in pr_issues[:limit]:
+            # Check if there are any PRs before iterating
+            if pr_issues.totalCount == 0:
+                self._set_cache(cache_key, prs)
+                return prs
+            
+            for issue in list(pr_issues)[:limit]:
                 # Get the actual PR object for more details
-                repo = self.github.get_repo(issue.repository.full_name)
-                pr = repo.get_pull(issue.number)
+                try:
+                    repo = self.github.get_repo(issue.repository.full_name)
+                    pr = repo.get_pull(issue.number)
+                except (GithubException, AttributeError) as e:
+                    logger.warning(f"Skipping PR {issue.number}: {e}")
+                    continue
                 
                 pr_data = {
                     'id': pr.id,
