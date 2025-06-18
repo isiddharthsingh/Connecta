@@ -22,7 +22,30 @@ class ResponseGenerator:
         """Format email data into a natural language response."""
         if query_type == "get_unread_count":
             count = data.get("count", 0)
-            return f"📧 You have {count} unread emails."
+            summary = data.get("summary", {})
+            
+            # Show detailed breakdown
+            response = f"📧 **Gmail Unread Summary**\n\n"
+            response += f"🎯 **Primary Tab**: {summary.get('primary', 0)} unread\n"
+            
+            # Show other categories if they have emails
+            other_categories = [
+                ("👥 **Social**", summary.get('social', 0)),
+                ("🛍️ **Promotions**", summary.get('promotions', 0)), 
+                ("📰 **Updates**", summary.get('updates', 0)),
+                ("💬 **Forums**", summary.get('forums', 0))
+            ]
+            
+            for category_name, category_count in other_categories:
+                if category_count > 0:
+                    response += f"{category_name}: {category_count} unread\n"
+            
+            total_inbox = summary.get('total_inbox', 0)
+            if total_inbox > count:
+                response += f"\n📥 **Total Inbox**: {total_inbox} unread emails"
+                response += f"\n💡 *Primary tab shows your most important emails*"
+            
+            return response
         
         elif query_type == "get_emails_from_sender":
             emails = data.get("emails", [])
