@@ -12,7 +12,7 @@ from googleapiclient.errors import HttpError
 import base64
 import logging
 
-from .base_integration import BaseIntegration, AuthenticationError, APIError
+from ..base.base_integration import BaseIntegration, AuthenticationError, APIError
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class GmailIntegration(BaseIntegration):
                     self.creds.refresh(Request())
                 else:
                     # Set up OAuth flow
-                    from ..config import config
+                    from ...config import config
                     if not config.google_client_id or not config.google_client_secret:
                         logger.error("Google credentials not configured in .env file")
                         return False
@@ -86,25 +86,65 @@ class GmailIntegration(BaseIntegration):
             return False
     
     async def get_unread_count(self) -> int:
-        """Get number of unread emails."""
+        """Get number of unread emails (Primary tab only for accuracy)."""
         cache_key = "unread_count"
         cached = self._get_cached(cache_key)
         if cached is not None:
             return cached
         
         try:
+            # Count only Primary tab emails (what users typically see)
             results = self.service.users().messages().list(
                 userId='me', 
-                q='is:unread'
+                q='is:unread in:primary'
             ).execute()
             
-            count = results.get('resultSizeEstimate', 0)
+            # Get actual count instead of estimate for small numbers
+            messages = results.get('messages', [])
+            count = len(messages)
+            
             self._set_cache(cache_key, count)
             return count
             
         except HttpError as e:
             logger.error(f"Failed to get unread count: {e}")
             raise APIError(f"Failed to get unread count: {e}")
+    
+    async def get_unread_summary(self) -> Dict[str, int]:
+        """Get detailed unread email breakdown by category."""
+        cache_key = "unread_summary"
+        cached = self._get_cached(cache_key)
+        if cached is not None:
+            return cached
+        
+        try:
+            categories = {
+                'primary': 'is:unread in:primary',
+                'social': 'is:unread category:social',
+                'promotions': 'is:unread category:promotions',
+                'updates': 'is:unread category:updates',
+                'forums': 'is:unread category:forums',
+                'total_inbox': 'is:unread in:inbox'
+            }
+            
+            summary = {}
+            for category, query in categories.items():
+                try:
+                    results = self.service.users().messages().list(
+                        userId='me', 
+                        q=query
+                    ).execute()
+                    messages = results.get('messages', [])
+                    summary[category] = len(messages)
+                except HttpError:
+                    summary[category] = 0
+            
+            self._set_cache(cache_key, summary)
+            return summary
+            
+        except HttpError as e:
+            logger.error(f"Failed to get unread summary: {e}")
+            raise APIError(f"Failed to get unread summary: {e}")
     
     async def get_emails_from_sender(self, sender: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Get emails from specific sender."""

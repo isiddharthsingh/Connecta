@@ -6,9 +6,8 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 
 from .config import config
-from .integrations.gmail import GmailIntegration
-from .integrations.github import GitHubIntegration
-from .integrations.base_integration import BaseIntegration, AuthenticationError, APIError
+from .integrations import GmailIntegration, GitHubIntegration
+from .integrations import BaseIntegration, APIError
 from .ai.query_parser import QueryParser, QueryIntent
 from .ai.response_generator import ResponseGenerator
 
@@ -98,8 +97,10 @@ class PersonalAssistant:
             data = {}
             
             if intent.action == "get_unread_count":
-                count = await gmail.get_unread_count()
-                data = {"count": count}
+                # Get detailed breakdown instead of just count
+                summary = await gmail.get_unread_summary()
+                count = summary.get('primary', 0)  # Primary count for main response
+                data = {"count": count, "summary": summary}
             
             elif intent.action == "get_emails_from_sender":
                 sender = intent.parameters.get("sender")

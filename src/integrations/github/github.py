@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import logging
 from github import Github, GithubException
 
-from .base_integration import BaseIntegration, AuthenticationError, APIError
+from ..base.base_integration import BaseIntegration, AuthenticationError, APIError
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ class GitHubIntegration(BaseIntegration):
     async def authenticate(self) -> bool:
         """Authenticate with GitHub using personal access token."""
         try:
-            from ..config import config
+            from ...config import config
             token = config.github_token
             
             if not token:
