@@ -383,6 +383,40 @@ class PersonalAssistant:
                 files = await drive.get_folder_contents(folder_id, limit)
                 data = {"files": files, "folder_id": folder_id or "root"}
             
+            elif intent.action == "read_file_by_name":
+                file_name = intent.parameters.get("file_name")
+                if not file_name:
+                    return "Please specify the file name to read."
+                
+                # First search for files with this name
+                files = await drive.search_files(file_name, 5)
+                if not files:
+                    return f"No files found with name containing '{file_name}'."
+                
+                # If multiple files found, read the first one and show alternatives
+                file_id = files[0].get('id')
+                content_result = await drive.read_file_content(file_id)
+                
+                data = {
+                    "content_result": content_result,
+                    "file": files[0],
+                    "alternatives": files[1:] if len(files) > 1 else []
+                }
+            
+            elif intent.action == "read_file_interactive":
+                # Get recent files for user to choose from
+                files = await drive.get_recent_files(10)
+                data = {"files": files, "action": "choose_file_to_read"}
+            
+            elif intent.action == "search_and_read_files":
+                search_term = intent.parameters.get("search_term")
+                if not search_term:
+                    return "Please specify what to search for in Drive."
+                
+                # Search for files and read their content
+                results = await drive.search_and_read_file(search_term, 3)
+                data = {"search_results": results, "search_term": search_term}
+            
             else:
                 return f"Drive action '{intent.action}' not implemented yet."
             
