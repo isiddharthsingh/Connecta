@@ -54,6 +54,7 @@ token.json
 *.pem
 *.key
 token.pickle
+calendar_token.pickle
 
 # Logs
 *.log
