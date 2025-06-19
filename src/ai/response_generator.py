@@ -447,6 +447,94 @@ class ResponseGenerator:
             
             return response
         
+        elif query_type == "read_file_by_name":
+            content_result = data.get("content_result", {})
+            file = data.get("file", {})
+            alternatives = data.get("alternatives", [])
+            
+            if not content_result.get("success", False):
+                response = f"❌ **Failed to read file**: {content_result.get('error', 'Unknown error')}\n\n"
+                if file:
+                    response += f"📄 **File**: {file.get('name', 'Unknown')}\n"
+                    if content_result.get('supported_types'):
+                        response += f"✅ **Supported types**: {', '.join(content_result['supported_types'])}\n"
+                return response
+            
+            file_emoji = self._get_file_emoji(content_result.get('file_type', ''))
+            response = f"{file_emoji} **File Content: {content_result.get('file_name', 'Unknown')}**\n\n"
+            
+            # File metadata
+            response += f"📝 **Type**: {content_result.get('file_type', 'Unknown')}\n"
+            if content_result.get('file_size_mb', 0) > 0:
+                response += f"📊 **Size**: {content_result['file_size_mb']} MB\n"
+            response += f"📏 **Content Length**: {content_result.get('content_length', 0):,} characters\n"
+            
+            # Content
+            content = content_result.get('content', '')
+            if len(content) > 2000:
+                response += f"\n📄 **Content Preview** (first 2000 characters):\n```\n{content[:2000]}...\n```"
+                response += f"\n💡 **Note**: Full content is {content_result.get('content_length', 0):,} characters. Use file preview for complete content."
+            else:
+                response += f"\n📄 **Content**:\n```\n{content}\n```"
+            
+            # Show alternatives if multiple files were found
+            if alternatives:
+                response += f"\n\n🔍 **Other files with similar names**:\n"
+                for alt in alternatives[:3]:  # Show up to 3 alternatives
+                    alt_emoji = self._get_file_emoji(alt.get('type', ''))
+                    response += f"   {alt_emoji} {alt.get('name', 'Unknown')}\n"
+            
+            return response
+        
+        elif query_type == "read_file_interactive":
+            files = data.get("files", [])
+            
+            if not files:
+                return "📄 No recent files found to read."
+            
+            response = "📄 **Choose a file to read** (recent files):\n\n"
+            for i, file in enumerate(files[:10], 1):
+                file_emoji = self._get_file_emoji(file.get('type', ''))
+                response += f"{i}. {file_emoji} **{file.get('name', 'Untitled')}**\n"
+                if file.get('type'):
+                    response += f"   📝 {file['type']}"
+                if file.get('size_mb', 0) > 0:
+                    response += f" • {file['size_mb']} MB"
+                response += "\n\n"
+            
+            response += "💡 **To read a specific file, say**: \"read file [filename]\""
+            return response
+        
+        elif query_type == "search_and_read_files":
+            search_results = data.get("search_results", [])
+            search_term = data.get("search_term", "")
+            
+            if not search_results:
+                return f"🔍 No readable files found for search term: '{search_term}'"
+            
+            response = f"🔍 **Search Results for '{search_term}'** ({len(search_results)} files):\n\n"
+            
+            for i, result in enumerate(search_results, 1):
+                file = result
+                content_result = result.get('content_result', {})
+                
+                file_emoji = self._get_file_emoji(file.get('type', ''))
+                response += f"{i}. {file_emoji} **{file.get('name', 'Untitled')}**\n"
+                
+                if content_result.get('success'):
+                    content = content_result.get('content', '')
+                    preview = content[:300] + '...' if len(content) > 300 else content
+                    response += f"   📄 **Content Preview**:\n   ```\n   {preview}\n   ```\n"
+                    response += f"   📏 {content_result.get('content_length', 0):,} characters"
+                    if content_result.get('file_size_mb', 0) > 0:
+                        response += f" • {content_result['file_size_mb']} MB"
+                    response += "\n\n"
+                else:
+                    error = content_result.get('error', 'Could not read file')
+                    response += f"   ❌ {error}\n\n"
+            
+            return response
+        
         return "📄 Drive data processed."
     
     def _get_file_emoji(self, file_type: str) -> str:
@@ -598,6 +686,9 @@ class ResponseGenerator:
 • "Show my documents/spreadsheets/presentations"
 • "Drive storage usage"
 • "Show PDFs/images"
+• "Read file [filename]" - Read file content
+• "Show content of file" - Interactive file selection
+• "Search and read files for [term]" - Search and read content
 
 🔍 **General Commands**:
 • "Daily summary"
