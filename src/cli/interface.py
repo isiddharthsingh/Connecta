@@ -150,7 +150,8 @@ class AssistantCLI:
 I can help you with:
 • 📧 **Email management** - Check unread emails, search, summarize
 • 🔄 **GitHub workflow** - PRs to review, issues, commits, stats  
-• 📅 **Calendar** *(coming soon)* - Schedule, meetings, free time
+• 📅 **Calendar** - Schedule, meetings, free time
+• 📄 **Google Drive** - Files, documents, storage, sharing
 • 🎯 **Daily summaries** - Overview of your tasks and priorities
 
 **Quick Start Commands**:
@@ -158,6 +159,7 @@ I can help you with:
 • `daily summary` - Get your daily overview
 • `how many unread emails?` - Check email count
 • `what PRs need review?` - GitHub pull requests
+• `show my google docs` - Browse Drive documents
 • `system status` - Check integration health
 
 **Tips**: 
@@ -188,10 +190,23 @@ I can help you with:
 • `Repository statistics`
 • `GitHub summary`
 
-## 📅 Calendar Commands *(Coming Soon)*
+## 📅 Calendar Commands
 • `What's my schedule today?`
 • `Next meeting`
 • `Free time this afternoon`
+• `Schedule for tomorrow`
+• `This week's calendar`
+
+## 📄 Google Drive Commands
+• `Show my google docs` - Browse documents
+• `Show my google sheets` - Browse spreadsheets  
+• `Show my google slides` - Browse presentations
+• `Show my folders` - Browse folders
+• `Show my PDFs` - Browse PDF files
+• `Show my images` - Browse image files
+• `Search files for [term]` - Search by name/content
+• `Show shared files` - Files shared with you
+• `What's my drive storage usage?` - Storage info
 
 ## 🔍 General Commands
 • `Daily summary` - Complete overview
