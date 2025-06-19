@@ -160,6 +160,7 @@ I can help you with:
 • `how many unread emails?` - Check email count
 • `what PRs need review?` - GitHub pull requests
 • `show my google docs` - Browse Drive documents
+• `read file project-notes` - Read file content
 • `system status` - Check integration health
 
 **Tips**: 
@@ -207,6 +208,9 @@ I can help you with:
 • `Search files for [term]` - Search by name/content
 • `Show shared files` - Files shared with you
 • `What's my drive storage usage?` - Storage info
+• `Read file [filename]` - Read and display file content
+• `Show content of file` - Interactive file selection to read
+• `Search and read files for [term]` - Find and read content
 
 ## 🔍 General Commands
 • `Daily summary` - Complete overview
