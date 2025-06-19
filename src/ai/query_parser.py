@@ -43,7 +43,7 @@ class QueryParser:
             (r'(?:schedule|calendar).*(?:today|this day)', 'get_today_schedule'),
             (r'(?:schedule|calendar).*(?:tomorrow|next day)', 'get_tomorrow_schedule'),
             (r'(?:schedule|calendar).*(?:this week|week)', 'get_week_schedule'),
-            (r'(?:next|upcoming).*(?:meeting|event)', 'get_next_events'),
+            (r'(?:next|upcoming).*(?:meeting|event)', 'get_next_meeting'),
             (r'(?:free time|available)', 'get_free_time'),
             (r'(?:busy|occupied).*(?:when|time)', 'get_busy_times'),
         ]
@@ -52,7 +52,7 @@ class QueryParser:
             (r'(?:daily|day).*(?:summary|overview)', 'get_daily_summary'),
             (r'(?:what.*focus|priority|priorities)', 'get_priorities'),
             (r'(?:status|overview).*(?:all|everything)', 'get_all_status'),
-            (r'(?:help|assist).*(?:with|me)', 'get_help'),
+            (r'(?:help|assist)', 'get_help'),
         ]
     
     def parse(self, query: str) -> QueryIntent:
