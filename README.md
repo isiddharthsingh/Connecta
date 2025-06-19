@@ -16,11 +16,12 @@ A comprehensive personal AI assistant that integrates with Gmail, GitHub, Calend
 - Monitor recent commits
 - Repository statistics and insights
 
-### 📅 Calendar Integration *(Coming Soon)*
+### 📅 Calendar Integration
 - Daily schedule overview
 - Upcoming meetings and events
 - Free time identification
-- Smart scheduling suggestions
+- Tomorrow and weekly schedule views
+- Smart calendar insights
 
 ### 🎯 Smart Features
 - Natural language query processing
@@ -109,6 +110,15 @@ python main.py query "Issues assigned to me"
 python main.py query "Repository statistics"
 ```
 
+### Calendar Commands
+```bash
+python main.py query "What's my schedule today?"
+python main.py query "Schedule for tomorrow"
+python main.py query "This week's calendar"
+python main.py query "Next meeting"
+python main.py query "Free time today"
+```
+
 ### General Commands
 ```bash
 python main.py query "Daily summary"
@@ -164,9 +174,9 @@ personal-assistant/
 ### ✅ Currently Available
 - **Gmail**: Email management and search
 - **GitHub**: PR reviews, issues, commits, stats
+- **Google Calendar**: Schedule management, meetings, free time
 
 ### 🚧 Coming Soon
-- **Google Calendar**: Schedule management
 - **Trello**: Task and project tracking
 - **Slack**: Team communication insights
 - **Notion**: Note and knowledge management
