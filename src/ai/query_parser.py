@@ -48,6 +48,20 @@ class QueryParser:
             (r'(?:busy|occupied).*(?:when|time)', 'get_busy_times'),
         ]
         
+        self.drive_patterns = [
+            (r'(?:recent|latest).*(?:file|document)', 'get_recent_files'),
+            (r'(?:search|find).*(?:file|document).*(?:for|about)\s+(.+)', 'search_files'),
+            (r'(?:shared|share).*(?:file|document)', 'get_shared_files'),
+            (r'(?:google\s+)?(?:doc|document)', 'get_documents'),
+            (r'(?:google\s+)?(?:sheet|spreadsheet)', 'get_spreadsheets'),
+            (r'(?:google\s+)?(?:slide|presentation)', 'get_presentations'),
+            (r'(?:folder|directory)', 'get_folders'),
+            (r'(?:pdf|pdf file)', 'get_pdfs'),
+            (r'(?:image|picture|photo)', 'get_images'),
+            (r'(?:storage|space).*(?:usage|used)', 'get_storage_usage'),
+            (r'(?:drive|google drive).*(?:file|document)', 'get_recent_files'),
+        ]
+        
         self.general_patterns = [
             (r'(?:daily|day).*(?:summary|overview)', 'get_daily_summary'),
             (r'(?:what.*focus|priority|priorities)', 'get_priorities'),
@@ -73,6 +87,11 @@ class QueryParser:
         calendar_intent = self._try_match_patterns(query_lower, self.calendar_patterns, 'calendar')
         if calendar_intent:
             return calendar_intent
+        
+        # Try to match drive patterns
+        drive_intent = self._try_match_patterns(query_lower, self.drive_patterns, 'drive')
+        if drive_intent:
+            return drive_intent
         
         # Try to match general patterns
         general_intent = self._try_match_patterns(query_lower, self.general_patterns, 'general')
@@ -183,7 +202,8 @@ class QueryParser:
         
         # Boost confidence if exact keywords match
         exact_keywords = ['email', 'mail', 'github', 'pr', 'pull request', 
-                         'calendar', 'schedule', 'meeting', 'commit']
+                         'calendar', 'schedule', 'meeting', 'commit', 'drive', 
+                         'file', 'document', 'folder']
         
         keyword_bonus = 0
         for keyword in exact_keywords:
