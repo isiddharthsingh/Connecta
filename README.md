@@ -1,6 +1,6 @@
 # 🤖 Connecta
 
-A comprehensive personal AI assistant that integrates with Gmail, GitHub, Calendar, and other services to help you stay organized and productive.
+A comprehensive personal AI assistant that integrates with Gmail, GitHub, Calendar, and Google Drive to help you stay organized and productive. Now with **file content reading** - read Google Docs, Sheets, and text files directly in your terminal!
 
 ## ✨ Features
 
@@ -24,17 +24,21 @@ A comprehensive personal AI assistant that integrates with Gmail, GitHub, Calend
 - Smart calendar insights
 
 ### 📄 Google Drive Integration
+- **📖 Read file content directly in terminal** (Google Docs, Sheets, Slides, text files)
 - Browse and search files by type (Docs, Sheets, Slides, PDFs, Images)
-- File search by name and content
+- File search by name and content with content preview
 - View shared files and collaborations
 - Storage usage monitoring
 - Folder navigation and organization
 - Recent files access
+- Smart file size handling and error messages
 
 ### 🎯 Smart Features
 - Natural language query processing
 - Daily productivity summaries
 - Cross-service insights
+- **File content reading and search** across Google Drive
+- Smart file type detection and error handling
 - Proactive notifications
 
 ## 🚀 Quick Start
@@ -142,6 +146,33 @@ python main.py query "search files for project"
 python main.py query "search files for budget"
 python main.py query "find files about presentation"
 
+# File Reading & Content Access
+python main.py query "read file my-document"
+python main.py query "read file prof yotov logger"      # Read Google Doc content
+python main.py query "read file project-notes.txt"      # Read text files
+python main.py query "show content of file"             # Interactive file selection
+python main.py query "search and read files for meeting"  # Search and read content
+
+# File Reading Features:
+# ✅ Reads and displays file content directly in terminal
+# ✅ Shows file metadata (type, size, character count)
+# ✅ Smart file size limits (10MB max, 2KB preview for large files)
+# ✅ Handles multiple files with same name (shows alternatives)
+# ✅ Helpful error messages for unsupported file types
+
+# Supported file types for reading:
+# • Google Docs (exported as plain text)
+# • Google Sheets (exported as CSV format)
+# • Google Slides (exported as plain text)
+# • Text files (.txt, .md, .py, .js, .html, .css, etc.)
+# • Data files (JSON, XML, CSV)
+# • Code files (most programming languages)
+
+# Unsupported file types (with helpful error messages):
+# • PDF files (use Google Drive web interface)
+# • Images, videos, audio files
+# • Binary and encrypted files
+
 # Storage & Sharing
 python main.py query "show shared files"
 python main.py query "what's my drive storage usage"
@@ -154,6 +185,41 @@ python main.py query "Daily summary"
 python main.py query "System status"
 python main.py query "Help"
 ```
+
+### Handling Unsupported Files
+```bash
+# Example: Trying to read a PDF (shows helpful error)
+python main.py query "read file futeur-contract"
+```
+
+### Interactive File Selection
+```bash
+python main.py query "show content of file"
+```
+
+### Key File Reading Features
+
+✅ **Smart Content Display**
+- Full content for small files (< 2KB)
+- Preview with truncation for large files (> 2KB)
+- Character count and file size information
+
+✅ **File Type Support**
+- Google Docs → Plain text export
+- Google Sheets → CSV format export
+- Google Slides → Plain text export
+- Text files → Direct reading
+- Code files → Syntax preserved
+
+✅ **Error Handling**
+- Clear error messages for unsupported files (PDFs, images)
+- Alternative file suggestions when multiple matches found
+- File size limit protection (10MB max)
+
+✅ **Search Integration**
+- Search for files and read content in one command
+- Content preview in search results
+- Combined metadata and content display
 
 ## 🔧 API Setup Guides
 
@@ -208,7 +274,7 @@ personal-assistant/
 - **Gmail**: Email management and search
 - **GitHub**: PR reviews, issues, commits, stats
 - **Google Calendar**: Schedule management, meetings, free time
-- **Google Drive**: File browsing, search, storage management, collaboration
+- **Google Drive**: File browsing, search, **content reading**, storage management, collaboration
 
 ### 🚧 Coming Soon
 - **Trello**: Task and project tracking
