@@ -49,6 +49,11 @@ class QueryParser:
         ]
         
         self.drive_patterns = [
+            # File reading patterns - more specific first
+            (r'(?:search|find).*(?:and read|read).*(?:file|document).*(?:for|about)\s+(.+)', 'search_and_read_files'),
+            (r'(?:read|open|show content).*(?:file|document)\s+(.+)', 'read_file_by_name'),
+            (r'(?:read|open|show content).*(?:file|document)', 'read_file_interactive'),
+            # Other file operations
             (r'(?:recent|latest).*(?:file|document)', 'get_recent_files'),
             (r'(?:search|find).*(?:file|document).*(?:for|about)\s+(.+)', 'search_files'),
             (r'(?:shared|share).*(?:file|document)', 'get_shared_files'),
@@ -138,10 +143,16 @@ class QueryParser:
                 parameters['sender'] = sender
         
         # Extract search terms
-        if 'search' in action:
+        if 'search' in action or 'search_and_read_files' in action:
             if match.groups():
                 search_term = match.group(1).strip()
                 parameters['search_term'] = search_term
+        
+        # Extract file names for read operations
+        if 'read_file_by_name' in action:
+            if match.groups():
+                file_name = match.group(1).strip()
+                parameters['file_name'] = file_name
         
         # Extract time-related parameters
         time_params = self._extract_time_parameters(query)
