@@ -23,6 +23,14 @@ A comprehensive personal AI assistant that integrates with Gmail, GitHub, Calend
 - Tomorrow and weekly schedule views
 - Smart calendar insights
 
+### 📄 Google Drive Integration
+- Browse and search files by type (Docs, Sheets, Slides, PDFs, Images)
+- File search by name and content
+- View shared files and collaborations
+- Storage usage monitoring
+- Folder navigation and organization
+- Recent files access
+
 ### 🎯 Smart Features
 - Natural language query processing
 - Daily productivity summaries
@@ -119,6 +127,27 @@ python main.py query "Next meeting"
 python main.py query "Free time today"
 ```
 
+### Google Drive Commands
+```bash
+# File Type Browsing
+python main.py query "show my google docs"
+python main.py query "show my google sheets"
+python main.py query "show my google slides"
+python main.py query "show my folders"
+python main.py query "show my PDFs"
+python main.py query "show my images"
+
+# File Search
+python main.py query "search files for project"
+python main.py query "search files for budget"
+python main.py query "find files about presentation"
+
+# Storage & Sharing
+python main.py query "show shared files"
+python main.py query "what's my drive storage usage"
+python main.py query "show recent files"
+```
+
 ### General Commands
 ```bash
 python main.py query "Daily summary"
@@ -139,12 +168,14 @@ python main.py query "Help"
 3. Select scopes: `repo`, `read:user`, `read:org`
 4. Copy the token to your `.env` file
 
-### Google APIs (Gmail, Calendar)
+### Google APIs (Gmail, Calendar, Drive)
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project or select existing
-3. Enable Gmail API and Calendar API
+3. Enable Gmail API, Calendar API, and Drive API
 4. Create OAuth 2.0 credentials
 5. Add your credentials to `.env` file
+
+**Important**: For Drive integration, make sure to enable the Google Drive API in addition to Gmail and Calendar APIs.
 
 ## 🏗️ Architecture
 
@@ -152,9 +183,11 @@ python main.py query "Help"
 personal-assistant/
 ├── src/
 │   ├── integrations/          # Service integrations
-│   │   ├── gmail.py          # Gmail API integration
-│   │   ├── github.py         # GitHub API integration
-│   │   └── base_integration.py
+│   │   ├── gmail/            # Gmail API integration
+│   │   ├── github/           # GitHub API integration
+│   │   ├── calendar/         # Google Calendar integration
+│   │   ├── drive/            # Google Drive integration
+│   │   └── base/             # Base integration classes
 │   ├── ai/                   # AI and NLP components
 │   │   ├── query_parser.py   # Natural language understanding
 │   │   └── response_generator.py
@@ -175,6 +208,7 @@ personal-assistant/
 - **Gmail**: Email management and search
 - **GitHub**: PR reviews, issues, commits, stats
 - **Google Calendar**: Schedule management, meetings, free time
+- **Google Drive**: File browsing, search, storage management, collaboration
 
 ### 🚧 Coming Soon
 - **Trello**: Task and project tracking
