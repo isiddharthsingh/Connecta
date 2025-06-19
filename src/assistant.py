@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 
 from .config import config
-from .integrations import GmailIntegration, GitHubIntegration, CalendarIntegration
+from .integrations import GmailIntegration, GitHubIntegration, CalendarIntegration, DriveIntegration
 from .integrations import BaseIntegration, APIError
 from .ai.query_parser import QueryParser, QueryIntent
 from .ai.response_generator import ResponseGenerator
@@ -38,6 +38,11 @@ class PersonalAssistant:
         if config.get("integrations.calendar.enabled", True):
             cache_duration = config.get("integrations.calendar.cache_duration", 300)
             self.integrations["calendar"] = CalendarIntegration(cache_duration)
+        
+        # Drive integration
+        if config.get("integrations.drive.enabled", True):
+            cache_duration = config.get("integrations.drive.cache_duration", 300)
+            self.integrations["drive"] = DriveIntegration(cache_duration)
         
         # TODO: Add trello and other integrations
         logger.info(f"Initialized {len(self.integrations)} integrations")
@@ -77,6 +82,8 @@ class PersonalAssistant:
                 return await self._handle_github_query(intent)
             elif intent.service == "calendar":
                 return await self._handle_calendar_query(intent)
+            elif intent.service == "drive":
+                return await self._handle_drive_query(intent)
             elif intent.service == "general":
                 return await self._handle_general_query(intent)
             else:
@@ -298,6 +305,97 @@ class PersonalAssistant:
                 "An error occurred while processing your calendar request."
             )
     
+    async def _handle_drive_query(self, intent: QueryIntent) -> str:
+        """Handle Google Drive-related queries."""
+        drive = self.integrations.get("drive")
+        if not drive or not drive.authenticated:
+            return self.response_generator.format_error_response(
+                "Google Drive integration not available or not authenticated.", "Drive"
+            )
+        
+        try:
+            data = {}
+            
+            if intent.action == "get_recent_files":
+                limit = intent.parameters.get("limit", 10)
+                files = await drive.get_recent_files(limit)
+                data = {"files": files}
+            
+            elif intent.action == "search_files":
+                search_term = intent.parameters.get("search_term")
+                if not search_term:
+                    return "Please specify what to search for in Drive."
+                
+                limit = intent.parameters.get("limit", 10)
+                files = await drive.search_files(search_term, limit)
+                data = {"files": files, "search_term": search_term}
+            
+            elif intent.action == "get_shared_files":
+                limit = intent.parameters.get("limit", 10)
+                files = await drive.get_shared_files(limit)
+                data = {"files": files}
+            
+            elif intent.action == "get_documents":
+                limit = intent.parameters.get("limit", 10)
+                files = await drive.get_documents(limit)
+                data = {"files": files, "file_type": "Google Docs"}
+            
+            elif intent.action == "get_spreadsheets":
+                limit = intent.parameters.get("limit", 10)
+                files = await drive.get_spreadsheets(limit)
+                data = {"files": files, "file_type": "Google Sheets"}
+            
+            elif intent.action == "get_presentations":
+                limit = intent.parameters.get("limit", 10)
+                files = await drive.get_presentations(limit)
+                data = {"files": files, "file_type": "Google Slides"}
+            
+            elif intent.action == "get_folders":
+                limit = intent.parameters.get("limit", 10)
+                files = await drive.get_folders(limit)
+                data = {"files": files, "file_type": "Folders"}
+            
+            elif intent.action == "get_pdfs":
+                limit = intent.parameters.get("limit", 10)
+                files = await drive.get_pdfs(limit)
+                data = {"files": files, "file_type": "PDF files"}
+            
+            elif intent.action == "get_images":
+                limit = intent.parameters.get("limit", 10)
+                files = await drive.get_images(limit)
+                data = {"files": files, "file_type": "Images"}
+            
+            elif intent.action == "get_storage_usage":
+                usage = await drive.get_storage_usage()
+                data = {"usage": usage}
+            
+            elif intent.action == "get_file_info":
+                file_id = intent.parameters.get("file_id")
+                if not file_id:
+                    return "Please specify the file ID to get information about."
+                
+                file_info = await drive.get_file_info(file_id)
+                data = {"file": file_info}
+            
+            elif intent.action == "get_folder_contents":
+                folder_id = intent.parameters.get("folder_id")
+                limit = intent.parameters.get("limit", 20)
+                files = await drive.get_folder_contents(folder_id, limit)
+                data = {"files": files, "folder_id": folder_id or "root"}
+            
+            else:
+                return f"Drive action '{intent.action}' not implemented yet."
+            
+            return self.response_generator.format_drive_response(data, intent.action)
+            
+        except APIError as e:
+            return self.response_generator.format_error_response(str(e), "Drive")
+        except Exception as e:
+            logger.error(f"Drive query error: {e}")
+            return self.response_generator.format_error_response(
+                "An error occurred while processing your Drive request."
+            )
+    
     async def _handle_general_query(self, intent: QueryIntent) -> str:
         """Handle general queries."""
         try:
@@ -328,7 +426,8 @@ class PersonalAssistant:
         data = {
             "email": {},
             "github": {},
-            "calendar": {}
+            "calendar": {},
+            "drive": {}
         }
         
         # Get email data
@@ -359,6 +458,17 @@ class PersonalAssistant:
                 data["calendar"]["today_events"] = today_events
             except Exception as e:
                 logger.error(f"Error getting Calendar data for summary: {e}")
+        
+        # Get Drive data
+        drive = self.integrations.get("drive")
+        if drive and drive.authenticated:
+            try:
+                recent_files = await drive.get_recent_files(5)
+                storage_usage = await drive.get_storage_usage()
+                data["drive"]["recent_files"] = recent_files
+                data["drive"]["storage_usage"] = storage_usage
+            except Exception as e:
+                logger.error(f"Error getting Drive data for summary: {e}")
         
         return self.response_generator.format_general_response(data, "get_daily_summary")
     
