@@ -2,6 +2,7 @@
 
 import os
 import pickle
+import io
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from google.auth.transport.requests import Request
@@ -9,6 +10,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from googleapiclient.http import MediaIoBaseDownload
 import logging
 
 from ..base.base_integration import BaseIntegration, AuthenticationError, APIError
@@ -368,6 +370,151 @@ class DriveIntegration(BaseIntegration):
         }
         
         return type_mapping.get(mime_type, 'Unknown')
+    
+    async def read_file_content(self, file_id: str, max_size_mb: int = 10) -> Dict[str, Any]:
+        """Read the content of a file from Google Drive."""
+        cache_key = f"file_content_{file_id}"
+        cached = self._get_cached(cache_key)
+        if cached is not None:
+            return cached
+        
+        try:
+            # First get file metadata
+            file_metadata = self.service.files().get(fileId=file_id, fields='name,mimeType,size').execute()
+            
+            file_name = file_metadata.get('name', 'Unknown')
+            mime_type = file_metadata.get('mimeType', '')
+            file_size = int(file_metadata.get('size', 0)) if file_metadata.get('size') else 0
+            
+            # Check file size (limit to prevent huge downloads)
+            max_size_bytes = max_size_mb * 1024 * 1024
+            if file_size > max_size_bytes:
+                return {
+                    'success': False,
+                    'error': f'File too large ({file_size / (1024*1024):.1f} MB). Maximum size is {max_size_mb} MB.',
+                    'file_name': file_name,
+                    'file_size_mb': round(file_size / (1024*1024), 2)
+                }
+            
+            content = None
+            
+            # Handle Google Docs, Sheets, Slides (export as different formats)
+            if mime_type == 'application/vnd.google-apps.document':
+                # Export Google Doc as plain text
+                request = self.service.files().export_media(fileId=file_id, mimeType='text/plain')
+                content = self._download_content(request)
+                
+            elif mime_type == 'application/vnd.google-apps.spreadsheet':
+                # Export Google Sheet as CSV
+                request = self.service.files().export_media(fileId=file_id, mimeType='text/csv')
+                content = self._download_content(request)
+                
+            elif mime_type == 'application/vnd.google-apps.presentation':
+                # Export Google Slides as plain text
+                request = self.service.files().export_media(fileId=file_id, mimeType='text/plain')
+                content = self._download_content(request)
+                
+            elif mime_type.startswith('text/') or mime_type in [
+                'application/json', 'application/xml', 'text/csv',
+                'application/javascript', 'text/html'
+            ]:
+                # Download text-based files directly
+                request = self.service.files().get_media(fileId=file_id)
+                content = self._download_content(request)
+                
+            else:
+                return {
+                    'success': False,
+                    'error': f'Unsupported file type: {self._get_file_type(mime_type)}',
+                    'file_name': file_name,
+                    'mime_type': mime_type,
+                    'supported_types': [
+                        'Google Docs', 'Google Sheets', 'Google Slides',
+                        'Text files', 'CSV files', 'JSON files', 'HTML files'
+                    ]
+                }
+            
+            if content is not None:
+                # Try to decode as UTF-8, fall back to latin-1 if needed
+                try:
+                    text_content = content.decode('utf-8')
+                except UnicodeDecodeError:
+                    text_content = content.decode('latin-1', errors='replace')
+                
+                result = {
+                    'success': True,
+                    'content': text_content,
+                    'file_name': file_name,
+                    'file_type': self._get_file_type(mime_type),
+                    'mime_type': mime_type,
+                    'file_size_mb': round(file_size / (1024*1024), 2) if file_size > 0 else 0,
+                    'content_length': len(text_content),
+                    'content_preview': text_content[:500] + '...' if len(text_content) > 500 else text_content
+                }
+                
+                self._set_cache(cache_key, result)
+                return result
+            else:
+                return {
+                    'success': False,
+                    'error': 'Failed to download file content',
+                    'file_name': file_name
+                }
+                
+        except HttpError as e:
+            logger.error(f"Failed to read file content: {e}")
+            if e.resp.status == 404:
+                return {
+                    'success': False,
+                    'error': 'File not found or access denied',
+                    'file_id': file_id
+                }
+            else:
+                raise APIError(f"Failed to read file content: {e}")
+        except Exception as e:
+            logger.error(f"Error reading file content: {e}")
+            return {
+                'success': False,
+                'error': f'Unexpected error: {str(e)}',
+                'file_id': file_id
+            }
+    
+    def _download_content(self, request) -> bytes:
+        """Download content from a Google Drive request."""
+        file_io = io.BytesIO()
+        downloader = MediaIoBaseDownload(file_io, request)
+        
+        done = False
+        while done is False:
+            status, done = downloader.next_chunk()
+        
+        return file_io.getvalue()
+    
+    async def search_and_read_file(self, search_term: str, max_results: int = 5) -> List[Dict[str, Any]]:
+        """Search for files and return their content if readable."""
+        try:
+            # First search for files
+            files = await self.search_files(search_term, max_results)
+            
+            results = []
+            for file in files:
+                file_id = file.get('id')
+                if file_id:
+                    # Try to read the content
+                    content_result = await self.read_file_content(file_id, max_size_mb=5)  # Smaller limit for search
+                    
+                    # Combine file metadata with content
+                    result = {
+                        **file,
+                        'content_result': content_result
+                    }
+                    results.append(result)
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Failed to search and read files: {e}")
+            raise APIError(f"Failed to search and read files: {e}")
     
     # Convenience methods for common file types
     async def get_documents(self, limit: int = 10) -> List[Dict[str, Any]]:
