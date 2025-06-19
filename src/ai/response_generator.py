@@ -158,6 +158,113 @@ class ResponseGenerator:
         
         return "🔧 GitHub data processed."
     
+    def format_calendar_response(self, data: Dict[str, Any], query_type: str) -> str:
+        """Format calendar data into a natural language response."""
+        if query_type in ["get_today_schedule", "get_tomorrow_schedule", "get_week_schedule"]:
+            events = data.get("events", [])
+            date_str = data.get("date", "")
+            
+            if not events:
+                return f"📅 No events scheduled for {date_str}."
+            
+            response = f"📅 Your schedule for {date_str} ({len(events)} events):\n\n"
+            
+            for event in events:
+                # Format time
+                start_time = event.get('start_time')
+                end_time = event.get('end_time')
+                
+                if event.get('is_all_day'):
+                    time_str = "🌅 All day"
+                else:
+                    start_str = start_time.strftime("%I:%M %p") if start_time else "Unknown"
+                    end_str = end_time.strftime("%I:%M %p") if end_time else "Unknown"
+                    time_str = f"⏰ {start_str} - {end_str}"
+                
+                response += f"• **{event.get('title', 'No Title')}**\n"
+                response += f"  {time_str}\n"
+                
+                if event.get('location'):
+                    response += f"  📍 {event['location']}\n"
+                
+                if event.get('attendees') and len(event['attendees']) > 1:
+                    attendee_count = len(event['attendees'])
+                    response += f"  👥 {attendee_count} attendees\n"
+                
+                if event.get('duration_minutes'):
+                    duration = event['duration_minutes']
+                    if duration >= 60:
+                        hours = duration // 60
+                        minutes = duration % 60
+                        duration_str = f"{hours}h {minutes}m" if minutes > 0 else f"{hours}h"
+                    else:
+                        duration_str = f"{duration}m"
+                    response += f"  ⏱️ {duration_str}\n"
+                
+                response += "\n"
+            
+            return response
+        
+        elif query_type == "get_next_meeting":
+            meeting = data.get("meeting")
+            
+            if not meeting:
+                return "📅 No upcoming meetings found in the next 7 days."
+            
+            start_time = meeting.get('start_time')
+            time_str = start_time.strftime("%A, %B %d at %I:%M %p") if start_time else "Unknown time"
+            
+            response = f"📅 **Next Meeting**: {meeting.get('title', 'No Title')}\n\n"
+            response += f"⏰ **When**: {time_str}\n"
+            
+            if meeting.get('location'):
+                response += f"📍 **Where**: {meeting['location']}\n"
+            
+            if meeting.get('attendees') and len(meeting['attendees']) > 1:
+                attendee_count = len(meeting['attendees'])
+                response += f"👥 **Attendees**: {attendee_count} people\n"
+            
+            if meeting.get('duration_minutes'):
+                duration = meeting['duration_minutes']
+                if duration >= 60:
+                    hours = duration // 60
+                    minutes = duration % 60
+                    duration_str = f"{hours}h {minutes}m" if minutes > 0 else f"{hours}h"
+                else:
+                    duration_str = f"{duration}m"
+                response += f"⏱️ **Duration**: {duration_str}\n"
+            
+            return response
+        
+        elif query_type == "get_free_time":
+            free_slots = data.get("free_slots", [])
+            
+            if not free_slots:
+                return "📅 No free time slots found today (15+ minutes)."
+            
+            response = f"📅 **Free Time Today** ({len(free_slots)} slots):\n\n"
+            
+            for slot in free_slots:
+                start_time = slot.get('start_time')
+                end_time = slot.get('end_time')
+                duration = slot.get('duration_minutes', 0)
+                
+                start_str = start_time.strftime("%I:%M %p") if start_time else "Unknown"
+                end_str = end_time.strftime("%I:%M %p") if end_time else "Unknown"
+                
+                if duration >= 60:
+                    hours = duration // 60
+                    minutes = duration % 60
+                    duration_str = f"{hours}h {minutes}m" if minutes > 0 else f"{hours}h"
+                else:
+                    duration_str = f"{duration}m"
+                
+                response += f"• {start_str} - {end_str} ({duration_str})\n"
+            
+            return response
+        
+        return "📅 Calendar data processed."
+    
     def format_general_response(self, data: Dict[str, Any], query_type: str) -> str:
         """Format general responses."""
         if query_type == "get_daily_summary":
@@ -184,8 +291,10 @@ class ResponseGenerator:
         assigned_issues = len(github_data.get("assigned_issues", []))
         response += f"🔄 **GitHub**: {prs_to_review} PRs to review, {assigned_issues} assigned issues\n"
         
-        # Calendar summary (when implemented)
-        response += f"📅 **Calendar**: Check schedule for today\n"
+        # Calendar summary
+        calendar_data = data.get("calendar", {})
+        today_events = len(calendar_data.get("today_events", []))
+        response += f"📅 **Calendar**: {today_events} events today\n"
         
         response += f"\n🎯 **Focus Areas**:\n"
         if prs_to_review > 0:
@@ -259,8 +368,10 @@ class ResponseGenerator:
 • "Issues assigned to me"
 • "Repository statistics"
 
-📅 **Calendar Commands** (Coming Soon):
+📅 **Calendar Commands**:
 • "What's my schedule today?"
+• "Schedule for tomorrow"
+• "This week's calendar"
 • "Next meeting"
 • "Free time today"
 
