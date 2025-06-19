@@ -265,6 +265,215 @@ class ResponseGenerator:
         
         return "📅 Calendar data processed."
     
+    def format_drive_response(self, data: Dict[str, Any], query_type: str) -> str:
+        """Format Google Drive data into a natural language response."""
+        if query_type in ["get_recent_files", "search_files", "get_shared_files", 
+                         "get_documents", "get_spreadsheets", "get_presentations", 
+                         "get_folders", "get_pdfs", "get_images"]:
+            files = data.get("files", [])
+            search_term = data.get("search_term")
+            file_type = data.get("file_type")
+            
+            if not files:
+                if search_term:
+                    return f"📄 No files found matching '{search_term}' in Drive."
+                elif file_type:
+                    return f"📄 No {file_type.lower()} found in Drive."
+                else:
+                    return "📄 No files found in Drive."
+            
+            # Generate title based on query type
+            if search_term:
+                title = f"📄 Found {len(files)} files matching '{search_term}':"
+            elif file_type:
+                title = f"📄 Your {file_type.lower()} ({len(files)} files):"
+            elif query_type == "get_shared_files":
+                title = f"📄 Files shared with you ({len(files)} files):"
+            else:
+                title = f"📄 Your recent files ({len(files)} files):"
+            
+            response = f"{title}\n\n"
+            
+            for file in files[:10]:  # Show max 10 files
+                # File type emoji
+                file_type_emoji = self._get_file_emoji(file.get('type', ''))
+                
+                response += f"{file_type_emoji} **{file.get('name', 'Untitled')}"
+                if file.get('type'):
+                    response += f" ({file['type']})"
+                response += "**\n"
+                
+                # Size and modified time
+                if file.get('size_mb', 0) > 0:
+                    response += f"   📊 {file['size_mb']} MB"
+                else:
+                    response += f"   📊 --"
+                
+                if file.get('modified_days_ago') is not None:
+                    days_ago = file['modified_days_ago']
+                    if days_ago == 0:
+                        response += " • Modified today\n"
+                    elif days_ago == 1:
+                        response += " • Modified yesterday\n"
+                    else:
+                        response += f" • Modified {days_ago} days ago\n"
+                else:
+                    response += "\n"
+                
+                # Owner or shared by
+                if file.get('shared_by'):
+                    response += f"   👤 Shared by: {file['shared_by']}\n"
+                elif file.get('owner'):
+                    response += f"   👤 Owner: {file['owner']}\n"
+                
+                # View link
+                if file.get('view_link'):
+                    response += f"   🔗 {file['view_link']}\n"
+                
+                response += "\n"
+            
+            if len(files) > 10:
+                response += f"... and {len(files) - 10} more files."
+            
+            return response
+        
+        elif query_type == "get_storage_usage":
+            usage = data.get("usage", {})
+            
+            response = "💾 **Google Drive Storage Usage**\n\n"
+            response += f"📊 **Used**: {usage.get('usage_gb', 0)} GB of {usage.get('limit_gb', 0)} GB\n"
+            response += f"📈 **Usage**: {usage.get('usage_percentage', 0):.1f}%\n"
+            response += f"💡 **Available**: {usage.get('available_gb', 0)} GB\n"
+            
+            # Visual progress bar
+            percentage = usage.get('usage_percentage', 0)
+            bar_length = 20
+            filled_length = int(percentage / 100 * bar_length)
+            bar = "█" * filled_length + "░" * (bar_length - filled_length)
+            response += f"📊 [{bar}] {percentage:.1f}%\n"
+            
+            # Warning if storage is getting full
+            if percentage > 90:
+                response += "\n⚠️  **Warning**: Your storage is almost full!"
+            elif percentage > 75:
+                response += "\n💡 **Note**: Consider cleaning up old files soon."
+            
+            return response
+        
+        elif query_type == "get_file_info":
+            file = data.get("file", {})
+            
+            if not file:
+                return "📄 File not found or access denied."
+            
+            file_type_emoji = self._get_file_emoji(file.get('type', ''))
+            
+            response = f"{file_type_emoji} **File Details: {file.get('name', 'Untitled')}**\n\n"
+            response += f"📝 **Type**: {file.get('type', 'Unknown')}\n"
+            
+            if file.get('size_mb', 0) > 0:
+                response += f"📊 **Size**: {file['size_mb']} MB\n"
+            
+            if file.get('owner'):
+                response += f"👤 **Owner**: {file['owner']}\n"
+            
+            if file.get('modified_time_formatted'):
+                response += f"📅 **Modified**: {file['modified_time_formatted']}\n"
+            
+            if file.get('created_time'):
+                response += f"📅 **Created**: {file['created_time']}\n"
+            
+            if file.get('last_modified_by'):
+                response += f"✏️  **Last Modified By**: {file['last_modified_by']}\n"
+            
+            if file.get('view_link'):
+                response += f"🔗 **View**: {file['view_link']}\n"
+            
+            if file.get('download_link'):
+                response += f"⬇️ **Download**: {file['download_link']}\n"
+            
+            return response
+        
+        elif query_type == "get_folder_contents":
+            files = data.get("files", [])
+            folder_id = data.get("folder_id", "root")
+            
+            if not files:
+                folder_name = "root folder" if folder_id == "root" else "folder"
+                return f"📁 No files found in {folder_name}."
+            
+            folder_name = "root folder" if folder_id == "root" else f"folder (ID: {folder_id})"
+            response = f"📁 Contents of {folder_name} ({len(files)} items):\n\n"
+            
+            # Separate folders and files
+            folders = [f for f in files if f.get('type') == 'Folder']
+            other_files = [f for f in files if f.get('type') != 'Folder']
+            
+            # Show folders first
+            for folder in folders:
+                response += f"📁 **{folder.get('name', 'Untitled Folder')}**/\n"
+                if folder.get('modified_days_ago') is not None:
+                    days_ago = folder['modified_days_ago']
+                    if days_ago == 0:
+                        response += f"   📅 Modified today\n"
+                    elif days_ago == 1:
+                        response += f"   📅 Modified yesterday\n"
+                    else:
+                        response += f"   📅 Modified {days_ago} days ago\n"
+                response += "\n"
+            
+            # Show files
+            for file in other_files:
+                file_emoji = self._get_file_emoji(file.get('type', ''))
+                response += f"{file_emoji} **{file.get('name', 'Untitled')}**\n"
+                
+                if file.get('size_mb', 0) > 0:
+                    response += f"   📊 {file['size_mb']} MB"
+                else:
+                    response += f"   📊 --"
+                
+                if file.get('modified_days_ago') is not None:
+                    days_ago = file['modified_days_ago']
+                    if days_ago == 0:
+                        response += " • Modified today\n"
+                    elif days_ago == 1:
+                        response += " • Modified yesterday\n"
+                    else:
+                        response += f" • Modified {days_ago} days ago\n"
+                else:
+                    response += "\n"
+                
+                response += "\n"
+            
+            return response
+        
+        return "📄 Drive data processed."
+    
+    def _get_file_emoji(self, file_type: str) -> str:
+        """Get appropriate emoji for file type."""
+        emoji_map = {
+            'Google Doc': '📝',
+            'Google Sheet': '📊',
+            'Google Slides': '📽️',
+            'Folder': '📁',
+            'Google Form': '📋',
+            'Google Drawing': '🎨',
+            'PDF': '📕',
+            'JPEG Image': '🖼️',
+            'PNG Image': '🖼️',
+            'GIF Image': '🖼️',
+            'Text File': '📄',
+            'Excel File': '📊',
+            'Word Document': '📝',
+            'PowerPoint': '📽️',
+            'ZIP Archive': '🗜️',
+            'MP4 Video': '🎬',
+            'AVI Video': '🎬',
+            'MP3 Audio': '🎵',
+            'WAV Audio': '🎵'
+        }
+        return emoji_map.get(file_type, '📄')
+    
     def format_general_response(self, data: Dict[str, Any], query_type: str) -> str:
         """Format general responses."""
         if query_type == "get_daily_summary":
@@ -295,6 +504,13 @@ class ResponseGenerator:
         calendar_data = data.get("calendar", {})
         today_events = len(calendar_data.get("today_events", []))
         response += f"📅 **Calendar**: {today_events} events today\n"
+        
+        # Drive summary
+        drive_data = data.get("drive", {})
+        recent_files = len(drive_data.get("recent_files", []))
+        storage_usage = drive_data.get("storage_usage", {})
+        storage_percentage = storage_usage.get("usage_percentage", 0)
+        response += f"📄 **Drive**: {recent_files} recent files, {storage_percentage:.1f}% storage used\n"
         
         response += f"\n🎯 **Focus Areas**:\n"
         if prs_to_review > 0:
@@ -374,6 +590,14 @@ class ResponseGenerator:
 • "This week's calendar"
 • "Next meeting"
 • "Free time today"
+
+📄 **Drive Commands**:
+• "Show recent files"
+• "Search files for [term]"
+• "Show shared files"
+• "Show my documents/spreadsheets/presentations"
+• "Drive storage usage"
+• "Show PDFs/images"
 
 🔍 **General Commands**:
 • "Daily summary"
