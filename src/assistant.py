@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 
 from .config import config
-from .integrations import GmailIntegration, GitHubIntegration
+from .integrations import GmailIntegration, GitHubIntegration, CalendarIntegration
 from .integrations import BaseIntegration, APIError
 from .ai.query_parser import QueryParser, QueryIntent
 from .ai.response_generator import ResponseGenerator
@@ -34,7 +34,12 @@ class PersonalAssistant:
             cache_duration = config.get("integrations.github.cache_duration", 600)
             self.integrations["github"] = GitHubIntegration(cache_duration)
         
-        # TODO: Add calendar, trello, and other integrations
+        # Calendar integration
+        if config.get("integrations.calendar.enabled", True):
+            cache_duration = config.get("integrations.calendar.cache_duration", 300)
+            self.integrations["calendar"] = CalendarIntegration(cache_duration)
+        
+        # TODO: Add trello and other integrations
         logger.info(f"Initialized {len(self.integrations)} integrations")
     
     async def initialize(self) -> Dict[str, bool]:
@@ -251,8 +256,47 @@ class PersonalAssistant:
     
     async def _handle_calendar_query(self, intent: QueryIntent) -> str:
         """Handle calendar-related queries."""
-        # TODO: Implement calendar integration
-        return "📅 Calendar integration coming soon! For now, try email or GitHub commands."
+        calendar = self.integrations.get("calendar")
+        if not calendar or not calendar.authenticated:
+            return self.response_generator.format_error_response(
+                "Calendar integration not available or not authenticated.", "Calendar"
+            )
+        
+        try:
+            data = {}
+            
+            if intent.action == "get_today_schedule":
+                events = await calendar.get_today_schedule()
+                data = {"events": events, "date": "today"}
+            
+            elif intent.action == "get_tomorrow_schedule":
+                events = await calendar.get_tomorrow_schedule()
+                data = {"events": events, "date": "tomorrow"}
+            
+            elif intent.action == "get_week_schedule":
+                events = await calendar.get_week_schedule()
+                data = {"events": events, "date": "this week"}
+            
+            elif intent.action == "get_next_meeting":
+                next_meeting = await calendar.get_next_meeting()
+                data = {"meeting": next_meeting}
+            
+            elif intent.action == "get_free_time":
+                free_slots = await calendar.get_free_time_today()
+                data = {"free_slots": free_slots}
+            
+            else:
+                return f"Calendar action '{intent.action}' not implemented yet."
+            
+            return self.response_generator.format_calendar_response(data, intent.action)
+            
+        except APIError as e:
+            return self.response_generator.format_error_response(str(e), "Calendar")
+        except Exception as e:
+            logger.error(f"Calendar query error: {e}")
+            return self.response_generator.format_error_response(
+                "An error occurred while processing your calendar request."
+            )
     
     async def _handle_general_query(self, intent: QueryIntent) -> str:
         """Handle general queries."""
@@ -306,6 +350,15 @@ class PersonalAssistant:
                 data["github"]["assigned_issues"] = assigned_issues
             except Exception as e:
                 logger.error(f"Error getting GitHub data for summary: {e}")
+        
+        # Get Calendar data
+        calendar = self.integrations.get("calendar")
+        if calendar and calendar.authenticated:
+            try:
+                today_events = await calendar.get_today_schedule()
+                data["calendar"]["today_events"] = today_events
+            except Exception as e:
+                logger.error(f"Error getting Calendar data for summary: {e}")
         
         return self.response_generator.format_general_response(data, "get_daily_summary")
     
