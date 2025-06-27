@@ -100,5 +100,25 @@ class Config:
         """Check if debug mode is enabled."""
         return os.getenv("DEBUG", "False").lower() == "true"
 
+    @property
+    def ai_provider(self) -> str:
+        """Get the selected AI provider (openai or lmstudio)."""
+        return self.get("assistant.ai_provider", "openai")
+    
+    @property
+    def lmstudio_base_url(self) -> str:
+        """Get LM Studio base URL from config or environment."""
+        return os.getenv("LMSTUDIO_BASE_URL") or self.get("ai_providers.lmstudio.base_url", "http://localhost:1234/v1")
+    
+    @property
+    def lmstudio_model(self) -> str:
+        """Get LM Studio model name."""
+        return self.get("ai_providers.lmstudio.model", "local-model")
+    
+    @property
+    def openai_model(self) -> str:
+        """Get OpenAI model name."""
+        return self.get("ai_providers.openai.model", "gpt-3.5-turbo")
+
 # Global configuration instance
 config = Config() 
