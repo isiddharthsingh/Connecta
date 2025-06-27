@@ -23,8 +23,8 @@ class QueryParser:
     def __init__(self):
         self.email_patterns = [
             (r'(?:how many|count of|number of).*(?:unread|new).*(?:email|mail)', 'get_unread_count'),
-            (r'(?:email|mail).*from\s+(.+)', 'get_emails_from_sender'),
             (r'(?:summarize|summary of).*(?:email|mail).*from\s+(.+)', 'summarize_emails_from_sender'),
+            (r'(?:email|mail).*from\s+(.+)', 'get_emails_from_sender'),
             (r'(?:recent|latest).*(?:email|mail)', 'get_recent_emails'),
             (r'(?:urgent|important).*(?:email|mail)', 'get_urgent_emails'),
             (r'(?:email|mail).*(?:about|regarding)\s+(.+)', 'search_emails'),
