@@ -143,9 +143,7 @@ class PersonalAssistant:
                     return "Please specify which sender you want to summarize emails from."
                 
                 emails = await gmail.get_emails_from_sender(sender, 5)
-                # TODO: Implement email summarization with AI
                 data = {"emails": emails, "sender": sender}
-                return f"📧 Found {len(emails)} emails from {sender}. AI summarization coming soon!"
             
             else:
                 return f"Email action '{intent.action}' not implemented yet."
