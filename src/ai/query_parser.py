@@ -67,6 +67,32 @@ class QueryParser:
             (r'(?:drive|google drive).*(?:file|document)', 'get_recent_files'),
         ]
         
+        self.document_rag_patterns = [
+            # Document upload and management
+            (r'(?:upload|add).*(?:document|file)\s+(.+)', 'upload_document'),
+            (r'(?:list|show).*(?:document|uploaded).*(?:document|file)', 'list_documents'),
+            (r'(?:delete|remove).*(?:document|file)\s+(.+)', 'delete_document'),
+            # Document search and querying
+            (r'(?:ask|question).*(?:about|regarding).*(?:document|file)', 'agentic_query'),
+            (r'(?:search|find).*(?:in|within).*(?:document|file).*(?:for|about)\s+(.+)', 'search_documents'),
+            (r'(?:what|tell me).*(?:about|in).*(?:document|file)', 'agentic_query'),
+            # Document analysis
+            (r'(?:summarize|summary).*(?:document|file)\s+(.+)', 'summarize_document'),
+            (r'(?:analyze|analysis).*(?:document|file)\s+(.+)', 'analyze_document'),
+            (r'(?:compare|comparison).*(?:document|file)', 'compare_documents'),
+            (r'(?:extract|get).*(?:information|data).*(?:from|in).*(?:document|file)', 'extract_information'),
+            # Context management
+            (r'(?:clear|reset).*(?:context|conversation)', 'clear_context'),
+            (r'(?:show|get).*context.*(?:info|information)', 'context_info'),
+            (r'(?:what|show).*(?:context|conversation)', 'context_info'),
+            # Document metadata and stats
+            (r'(?:info|information|metadata).*(?:document|file)\s+(.+)', 'get_document_metadata'),
+            (r'(?:storage|document).*(?:stat|statistic)', 'get_storage_stats'),
+
+            # General document queries - catch-all
+            (r'(?:document|file).*(?:question|query|ask)', 'agentic_query'),
+        ]
+        
         self.general_patterns = [
             (r'(?:daily|day).*(?:summary|overview)', 'get_daily_summary'),
             (r'(?:what.*focus|priority|priorities)', 'get_priorities'),
@@ -92,6 +118,11 @@ class QueryParser:
         calendar_intent = self._try_match_patterns(query_lower, self.calendar_patterns, 'calendar')
         if calendar_intent:
             return calendar_intent
+        
+        # Try to match document RAG patterns first (more specific than drive)
+        doc_rag_intent = self._try_match_patterns(query_lower, self.document_rag_patterns, 'document_rag')
+        if doc_rag_intent:
+            return doc_rag_intent
         
         # Try to match drive patterns
         drive_intent = self._try_match_patterns(query_lower, self.drive_patterns, 'drive')
@@ -153,6 +184,57 @@ class QueryParser:
             if match.groups():
                 file_name = match.group(1).strip()
                 parameters['file_name'] = file_name
+        
+        # Extract document RAG parameters
+        if action == 'upload_document':
+            if match.groups():
+                file_path = match.group(1).strip()
+                parameters['file_path'] = file_path
+        
+        elif action == 'delete_document':
+            if match.groups():
+                doc_id = match.group(1).strip()
+                parameters['doc_id'] = doc_id
+        
+        elif action == 'summarize_document' or action == 'analyze_document' or action == 'get_document_metadata':
+            if match.groups():
+                doc_id = match.group(1).strip()
+                parameters['doc_id'] = doc_id
+        
+        elif action == 'search_documents':
+            if match.groups():
+                search_query = match.group(1).strip()
+                parameters['query'] = search_query
+        
+        elif action == 'agentic_query':
+            # For agentic queries, use the entire query as the parameter
+            parameters['query'] = query
+        
+        elif action == 'extract_information':
+            # Try to extract what type of information to extract
+            info_types = ['statistics', 'dates', 'names', 'financial', 'technical', 'business']
+            for info_type in info_types:
+                if info_type in query:
+                    parameters['info_type'] = info_type
+                    break
+            
+            # Try to extract document ID if mentioned
+            doc_id_match = re.search(r'(?:document|file|doc)\s+([a-zA-Z0-9_-]+)', query)
+            if doc_id_match:
+                parameters['doc_id'] = doc_id_match.group(1)
+        
+        elif action == 'compare_documents':
+            # Extract comparison aspect
+            aspects = ['methodology', 'findings', 'conclusions', 'technical', 'business', 'results']
+            for aspect in aspects:
+                if aspect in query:
+                    parameters['aspect'] = aspect
+                    break
+            
+            # Try to extract document IDs
+            doc_ids = re.findall(r'(?:document|file|doc)\s+([a-zA-Z0-9_-]+)', query)
+            if doc_ids:
+                parameters['doc_ids'] = doc_ids
         
         # Extract time-related parameters
         time_params = self._extract_time_parameters(query)
