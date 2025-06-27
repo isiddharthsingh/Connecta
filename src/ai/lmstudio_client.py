@@ -116,9 +116,9 @@ class LMStudioClient:
             if len(lines) > 1:
                 content = '\n'.join(lines[1:]).strip()
         
-        # Limit response length for speed
-        if len(content) > 400:
-            content = content[:400] + "..."
+        # Remove character limit to see full responses
+        # if len(content) > 800:
+        #     content = content[:800] + "..."
         
         return content if content else "I'm ready to help with your request."
     
@@ -189,7 +189,7 @@ Please provide:
 
 Keep the response concise but helpful, using emojis for better readability."""
 
-        return self.generate_response(prompt)
+        return self.generate_response(prompt, max_tokens=500)
     
     def answer_general_query(self, query: str, context: Dict[str, Any] = None) -> str:
         """Answer a general query using the local model."""
