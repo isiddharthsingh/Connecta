@@ -5,7 +5,15 @@ import logging
 from datetime import datetime
 import openai
 
-from ..config import config
+# Import config properly
+try:
+    from ..config import config
+except ImportError:
+    # Fallback for when run as script
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+    from config import config
 
 logger = logging.getLogger(__name__)
 
@@ -13,10 +21,61 @@ class ResponseGenerator:
     """Generates natural language responses from structured data."""
     
     def __init__(self):
-        self.client = None
+        # OpenAI client (keep existing functionality)
+        self.openai_client = None
         if config.openai_api_key:
             openai.api_key = config.openai_api_key
-            self.client = openai.OpenAI(api_key=config.openai_api_key)
+            self.openai_client = openai.OpenAI(api_key=config.openai_api_key)
+        
+        # LM Studio client (new functionality)
+        self.lmstudio_client = None
+        if config.ai_provider == "lmstudio":
+            try:
+                from .lmstudio_client import LMStudioClient
+                self.lmstudio_client = LMStudioClient()
+            except Exception as e:
+                logger.warning(f"Failed to initialize LM Studio client: {e}")
+                logger.info("Falling back to basic responses")
+    
+    def _get_ai_client(self):
+        """Get the appropriate AI client based on configuration."""
+        if config.ai_provider == "lmstudio" and self.lmstudio_client:
+            return self.lmstudio_client
+        elif config.ai_provider == "openai" and self.openai_client:
+            return self.openai_client
+        else:
+            return None
+    
+    def _enhance_with_ai(self, data: Dict[str, Any], query_type: str, basic_response: str) -> str:
+        """Enhance basic response with AI if available."""
+        ai_client = self._get_ai_client()
+        
+        if not ai_client:
+            return basic_response
+        
+        try:
+            # Use LM Studio for enhanced responses
+            if hasattr(ai_client, 'summarize_emails') and 'email' in query_type:
+                if query_type == "summarize_emails_from_sender":
+                    emails = data.get("emails", [])
+                    sender = data.get("sender")
+                    if emails:
+                        ai_summary = ai_client.summarize_emails(emails, sender)
+                        return f"📧 **AI Summary for emails from {sender}:**\n\n{ai_summary}"
+            
+            elif hasattr(ai_client, 'generate_daily_summary') and query_type == "get_daily_summary":
+                ai_summary = ai_client.generate_daily_summary(data)
+                return f"🤖 **AI Daily Summary:**\n\n{ai_summary}"
+            
+            elif hasattr(ai_client, 'answer_general_query') and query_type == "general_query":
+                query = data.get("query", "")
+                ai_response = ai_client.answer_general_query(query, data)
+                return f"🤖 {ai_response}"
+        
+        except Exception as e:
+            logger.error(f"AI enhancement failed: {e}")
+        
+        return basic_response
     
     def format_email_response(self, data: Dict[str, Any], query_type: str) -> str:
         """Format email data into a natural language response."""
@@ -67,6 +126,18 @@ class ResponseGenerator:
                 response += f"... and {len(emails) - 5} more emails."
             
             return response
+        
+        elif query_type == "summarize_emails_from_sender":
+            # This will be handled by AI enhancement
+            emails = data.get("emails", [])
+            sender = data.get("sender", "unknown sender")
+            
+            if not emails:
+                return f"📧 No emails found from {sender} to summarize."
+            
+            # Basic fallback response if AI is not available
+            basic_response = f"📧 Found {len(emails)} emails from {sender}. AI summarization failed - falling back to basic response."
+            return self._enhance_with_ai(data, query_type, basic_response)
         
         elif query_type == "get_recent_emails":
             emails = data.get("emails", [])
@@ -565,11 +636,13 @@ class ResponseGenerator:
     def format_general_response(self, data: Dict[str, Any], query_type: str) -> str:
         """Format general responses."""
         if query_type == "get_daily_summary":
-            return self._generate_daily_summary(data)
+            basic_response = self._generate_daily_summary(data)
+            return self._enhance_with_ai(data, query_type, basic_response)
         elif query_type == "get_all_status":
             return self._generate_status_overview(data)
         elif query_type == "general_query":
-            return self._handle_general_query(data)
+            basic_response = self._handle_general_query(data)
+            return self._enhance_with_ai(data, query_type, basic_response)
         
         return "ℹ️ Information processed."
     
@@ -629,11 +702,11 @@ class ResponseGenerator:
         """Handle general queries using OpenAI if available."""
         query = data.get("query", "")
         
-        if not self.client:
+        if not self.openai_client:
             return f"I understand you're asking about: '{query}'. However, I need OpenAI API access to provide a more detailed response. For now, I can help with specific commands like email, GitHub, or calendar queries."
         
         try:
-            response = self.client.chat.completions.create(
+            response = self.openai_client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": "You are a helpful personal assistant. Provide concise, actionable responses. If the user is asking about emails, GitHub, or calendar, suggest they use specific commands."},
