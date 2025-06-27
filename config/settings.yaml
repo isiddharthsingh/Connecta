@@ -3,6 +3,22 @@ assistant:
   version: "1.0.0"
   max_tokens: 2000
   temperature: 0.7
+  # AI Provider: 'openai' or 'lmstudio'
+  ai_provider: "lmstudio"  # Switch to lmstudio by default
+
+# AI Provider configurations
+ai_providers:
+  openai:
+    model: "gpt-3.5-turbo"
+    max_tokens: 2000
+    temperature: 0.7
+  
+  lmstudio:
+    base_url: "http://localhost:1234/v1"  # Default LM Studio endpoint
+    model: "local-model"  # Will be auto-detected from LM Studio
+    max_tokens: 300  # Increased for meaningful responses
+    temperature: 0.3  # Balanced for better content
+    timeout: 15  # Increased slightly for longer responses
 
 integrations:
   gmail:
