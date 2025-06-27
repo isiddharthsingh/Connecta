@@ -28,6 +28,7 @@ sqlalchemy>=2.0.0
 # HTTP and Async
 httpx>=0.24.0
 aiohttp>=3.8.0
+requests>=2.31.0
 
 # Utilities
 python-dateutil>=2.8.0
