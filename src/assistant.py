@@ -7,6 +7,7 @@ from datetime import datetime
 
 from .config import config
 from .integrations import GmailIntegration, GitHubIntegration, CalendarIntegration, DriveIntegration
+from .integrations.document_rag import DocumentRAGIntegration
 from .integrations import BaseIntegration, APIError
 from .ai.query_parser import QueryParser, QueryIntent
 from .ai.response_generator import ResponseGenerator
@@ -20,6 +21,13 @@ class PersonalAssistant:
         self.integrations: Dict[str, BaseIntegration] = {}
         self.query_parser = QueryParser()
         self.response_generator = ResponseGenerator()
+        # Add simple conversation memory
+        self.conversation_history = []
+        self.current_context = {
+            "last_service": None,
+            "last_action": None,
+            "last_response": None
+        }
         self._setup_integrations()
     
     def _setup_integrations(self):
@@ -43,6 +51,11 @@ class PersonalAssistant:
         if config.get("integrations.drive.enabled", True):
             cache_duration = config.get("integrations.drive.cache_duration", 300)
             self.integrations["drive"] = DriveIntegration(cache_duration)
+        
+        # Document RAG integration
+        if config.get("integrations.document_rag.enabled", True):
+            cache_duration = config.get("integrations.document_rag.cache_duration", 300)
+            self.integrations["document_rag"] = DocumentRAGIntegration(cache_duration)
         
         # TODO: Add trello and other integrations
         logger.info(f"Initialized {len(self.integrations)} integrations")
@@ -75,21 +88,37 @@ class PersonalAssistant:
             intent = self.query_parser.parse(query)
             logger.info(f"Parsed query - Service: {intent.service}, Action: {intent.action}, Confidence: {intent.confidence}")
             
+            # Check if this might be a follow-up query to the last conversation
+            if self._is_follow_up_query(query, intent):
+                # Route to the last service used if it makes sense
+                if self.current_context["last_service"] == "document_rag":
+                    intent.service = "document_rag"
+                    intent.action = "agentic_query"
+                    intent.parameters["query"] = query
+                    
             # Route to appropriate handler
+            response = ""
             if intent.service == "gmail":
-                return await self._handle_email_query(intent)
+                response = await self._handle_email_query(intent)
             elif intent.service == "github":
-                return await self._handle_github_query(intent)
+                response = await self._handle_github_query(intent)
             elif intent.service == "calendar":
-                return await self._handle_calendar_query(intent)
+                response = await self._handle_calendar_query(intent)
             elif intent.service == "drive":
-                return await self._handle_drive_query(intent)
+                response = await self._handle_drive_query(intent)
+            elif intent.service == "document_rag" or intent.service == "documents":
+                response = await self._handle_document_rag_query(intent)
             elif intent.service == "general":
-                return await self._handle_general_query(intent)
+                response = await self._handle_general_query(intent)
             else:
-                return self.response_generator.format_error_response(
+                response = self.response_generator.format_error_response(
                     f"Unknown service: {intent.service}"
                 )
+            
+            # Update conversation context
+            self._update_conversation_context(query, intent, response)
+            
+            return response
                 
         except Exception as e:
             logger.error(f"Error processing query '{query}': {e}")
@@ -428,6 +457,129 @@ class PersonalAssistant:
                 "An error occurred while processing your Drive request."
             )
     
+    async def _handle_document_rag_query(self, intent: QueryIntent) -> str:
+        """Handle document RAG queries."""
+        doc_rag = self.integrations.get("document_rag")
+        if not doc_rag or not doc_rag.authenticated:
+            return self.response_generator.format_error_response(
+                "Document RAG integration not available or not authenticated.", "Document RAG"
+            )
+        
+        try:
+            data = {}
+            
+            if intent.action == "upload_document":
+                file_path = intent.parameters.get("file_path")
+                custom_name = intent.parameters.get("custom_name")
+                
+                if not file_path:
+                    return "Please provide the file path to upload a document."
+                
+                result = await doc_rag.upload_document(file_path, custom_name)
+                data = {"upload_result": result}
+            
+            elif intent.action == "list_documents":
+                documents = await doc_rag.list_documents()
+                data = {"documents": documents}
+            
+            elif intent.action == "delete_document":
+                doc_id = intent.parameters.get("doc_id")
+                if not doc_id:
+                    return "Please provide the document ID to delete."
+                
+                success = await doc_rag.delete_document(doc_id)
+                data = {"success": success, "doc_id": doc_id}
+            
+            elif intent.action == "search_documents":
+                query = intent.parameters.get("query")
+                if not query:
+                    return "Please provide a search query."
+                
+                doc_ids = intent.parameters.get("doc_ids")
+                k = intent.parameters.get("limit", 5)
+                
+                results = await doc_rag.search_documents(query, doc_ids, k)
+                data = {"search_results": results, "query": query}
+            
+            elif intent.action == "agentic_query":
+                query = intent.parameters.get("query")
+                if not query:
+                    return "Please provide a query for the agentic RAG system."
+                
+                response = await doc_rag.process_agentic_query(query)
+                return response  # Return directly as it's already formatted
+            
+            elif intent.action == "summarize_document":
+                doc_id = intent.parameters.get("doc_id")
+                if not doc_id:
+                    return "Please provide the document ID to summarize."
+                
+                summary = await doc_rag.summarize_document(doc_id)
+                data = {"summary": summary, "doc_id": doc_id}
+            
+            elif intent.action == "compare_documents":
+                doc_ids = intent.parameters.get("doc_ids")
+                aspect = intent.parameters.get("aspect", "general")
+                
+                if not doc_ids or len(doc_ids) < 2:
+                    return "Please provide at least 2 document IDs to compare."
+                
+                comparison = await doc_rag.compare_documents(doc_ids, aspect)
+                data = {"comparison": comparison, "doc_ids": doc_ids, "aspect": aspect}
+            
+            elif intent.action == "analyze_document":
+                doc_id = intent.parameters.get("doc_id")
+                analysis_type = intent.parameters.get("analysis_type", "general")
+                
+                if not doc_id:
+                    return "Please provide the document ID to analyze."
+                
+                analysis = await doc_rag.analyze_document_content(doc_id, analysis_type)
+                data = {"analysis": analysis, "doc_id": doc_id, "analysis_type": analysis_type}
+            
+            elif intent.action == "extract_information":
+                doc_id = intent.parameters.get("doc_id")
+                info_type = intent.parameters.get("info_type")
+                
+                if not doc_id or not info_type:
+                    return "Please provide both document ID and information type to extract."
+                
+                extraction = await doc_rag.extract_key_information(doc_id, info_type)
+                data = {"extraction": extraction, "doc_id": doc_id, "info_type": info_type}
+            
+            elif intent.action == "get_document_metadata":
+                doc_id = intent.parameters.get("doc_id")
+                if not doc_id:
+                    return "Please provide the document ID to get metadata."
+                
+                metadata = await doc_rag.get_document_metadata(doc_id)
+                data = {"metadata": metadata, "doc_id": doc_id}
+            
+            elif intent.action == "get_storage_stats":
+                stats = await doc_rag.get_storage_stats()
+                data = {"stats": stats}
+            
+            elif intent.action == "clear_context":
+                result = doc_rag.clear_conversation_context()
+                return result  # Return directly as it's already formatted
+            
+            elif intent.action == "context_info":
+                info = doc_rag.get_context_info()
+                return info  # Return directly as it's already formatted
+            
+            else:
+                return f"Document RAG action '{intent.action}' not implemented yet."
+            
+            return self.response_generator.format_document_rag_response(data, intent.action)
+            
+        except APIError as e:
+            return self.response_generator.format_error_response(str(e), "Document RAG")
+        except Exception as e:
+            logger.error(f"Document RAG query error: {e}")
+            return self.response_generator.format_error_response(
+                "An error occurred while processing your document request."
+            )
+    
     async def _handle_general_query(self, intent: QueryIntent) -> str:
         """Handle general queries."""
         try:
@@ -520,6 +672,51 @@ class PersonalAssistant:
                 }
         
         return self.response_generator.format_general_response(data, "get_all_status")
+    
+    def _is_follow_up_query(self, query: str, intent: QueryIntent) -> bool:
+        """Check if this is a follow-up query to the previous conversation."""
+        if not self.current_context["last_service"]:
+            return False
+            
+        query_lower = query.lower().strip()
+        
+        # Check for typical follow-up patterns
+        follow_up_patterns = [
+            'what', 'how', 'why', 'when', 'where', 'who',
+            'this', 'that', 'it', 'here', 'there',
+            'tell me', 'explain', 'describe', 'show me',
+            'more', 'details', 'about'
+        ]
+        
+        # More lenient follow-up detection
+        has_follow_up_word = any(pattern in query_lower for pattern in follow_up_patterns)
+        is_short_query = len(query.split()) <= 8
+        has_low_confidence = intent.confidence < 0.7
+        is_general_service = intent.service == "general"
+        
+        # If it has follow-up words and is either short OR has low confidence OR is routed to general
+        if has_follow_up_word and (is_short_query or has_low_confidence or is_general_service):
+            return True
+                
+        return False
+    
+    def _update_conversation_context(self, query: str, intent: QueryIntent, response: str):
+        """Update conversation context with the latest interaction."""
+        # Add to conversation history
+        self.conversation_history.append({
+            "query": query,
+            "intent": intent,
+            "response": response[:200] + "..." if len(response) > 200 else response
+        })
+        
+        # Keep only last 5 conversations
+        if len(self.conversation_history) > 5:
+            self.conversation_history = self.conversation_history[-5:]
+        
+        # Update current context
+        self.current_context["last_service"] = intent.service
+        self.current_context["last_action"] = intent.action
+        self.current_context["last_response"] = response[:200] + "..." if len(response) > 200 else response
     
     async def shutdown(self):
         """Clean up resources."""
