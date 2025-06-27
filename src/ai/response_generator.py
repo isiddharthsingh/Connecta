@@ -156,6 +156,156 @@ class ResponseGenerator:
         
         return "📧 Email data processed."
     
+    def format_document_rag_response(self, data: Dict[str, Any], query_type: str) -> str:
+        """Format document RAG data into a natural language response."""
+        if query_type == "upload_document":
+            result = data.get("upload_result", {})
+            if result:
+                response = f"📄 **Document uploaded successfully!**\n\n"
+                response += f"🆔 **Document ID**: {result.get('doc_id')}\n"
+                response += f"📝 **Name**: {result.get('custom_name')}\n"
+                response += f"📁 **Original file**: {result.get('original_filename')}\n"
+                response += f"📊 **Size**: {result.get('file_size', 0) / 1024:.1f} KB\n"
+                response += f"🧩 **Chunks created**: {result.get('num_chunks')}\n"
+                response += f"📅 **Uploaded**: {result.get('upload_date', '').split('T')[0]}\n"
+                response += f"\n💡 You can now ask questions about this document!"
+                return response
+            else:
+                return "❌ Document upload failed."
+        
+        elif query_type == "list_documents":
+            documents = data.get("documents", [])
+            
+            if not documents:
+                return "📄 No documents have been uploaded yet.\n\n💡 Upload a document to get started with AI-powered document analysis!"
+            
+            response = f"📄 **Your uploaded documents** ({len(documents)} total):\n\n"
+            for doc in documents:
+                response += f"• **{doc.get('custom_name')}** (ID: `{doc.get('doc_id')}`)\n"
+                response += f"  📁 {doc.get('original_filename')}\n"
+                response += f"  📊 {doc.get('file_size', 0) / 1024:.1f} KB, {doc.get('num_chunks')} chunks\n"
+                response += f"  📅 Uploaded: {doc.get('upload_date', '').split('T')[0]}\n\n"
+            
+            response += "💡 Use `ask about document` or `summarize document` to analyze these files!"
+            return response
+        
+        elif query_type == "delete_document":
+            success = data.get("success", False)
+            doc_id = data.get("doc_id")
+            
+            if success:
+                return f"✅ Document `{doc_id}` has been deleted successfully."
+            else:
+                return f"❌ Failed to delete document `{doc_id}`. It may not exist."
+        
+        elif query_type == "search_documents":
+            results = data.get("search_results", [])
+            query = data.get("query", "")
+            
+            if not results:
+                return f"🔍 No relevant content found for query: \"{query}\"\n\n💡 Try rephrasing your search or check if documents are uploaded."
+            
+            response = f"🔍 **Search results for**: \"{query}\"\n\n"
+            response += f"Found {len(results)} relevant chunks:\n\n"
+            
+            for i, result in enumerate(results[:3], 1):  # Show top 3 results
+                response += f"**{i}. From '{result.get('document_name')}'** (Score: {result.get('similarity_score', 0):.3f})\n"
+                response += f"{result.get('content', '')[:200]}...\n\n"
+            
+            if len(results) > 3:
+                response += f"... and {len(results) - 3} more relevant results."
+            
+            return response
+        
+        elif query_type == "summarize_document":
+            summary = data.get("summary", "")
+            doc_id = data.get("doc_id")
+            
+            if summary:
+                response = f"📄 **Document Summary** (ID: `{doc_id}`)\n\n"
+                response += f"{summary}\n\n"
+                response += "💡 Ask specific questions about this document for more details!"
+                return response
+            else:
+                return f"❌ Failed to generate summary for document `{doc_id}`."
+        
+        elif query_type == "compare_documents":
+            comparison = data.get("comparison", "")
+            doc_ids = data.get("doc_ids", [])
+            aspect = data.get("aspect", "general")
+            
+            if comparison:
+                response = f"🔄 **Document Comparison** ({aspect})\n"
+                response += f"📄 Comparing {len(doc_ids)} documents\n\n"
+                response += f"{comparison}\n\n"
+                response += "💡 Try comparing with different aspects like 'methodology', 'findings', or 'conclusions'!"
+                return response
+            else:
+                return f"❌ Failed to compare documents."
+        
+        elif query_type == "analyze_document":
+            analysis = data.get("analysis", "")
+            doc_id = data.get("doc_id")
+            analysis_type = data.get("analysis_type", "general")
+            
+            if analysis:
+                response = f"🔬 **Document Analysis** (ID: `{doc_id}`, Focus: {analysis_type})\n\n"
+                response += f"{analysis}\n\n"
+                response += "💡 Try different analysis types like 'technical', 'business', or 'research'!"
+                return response
+            else:
+                return f"❌ Failed to analyze document `{doc_id}`."
+        
+        elif query_type == "extract_information":
+            extraction = data.get("extraction", "")
+            doc_id = data.get("doc_id")
+            info_type = data.get("info_type")
+            
+            if extraction:
+                response = f"📊 **Information Extraction** (ID: `{doc_id}`, Type: {info_type})\n\n"
+                response += f"{extraction}\n\n"
+                response += "💡 Try extracting 'statistics', 'dates', 'names', or 'financial data'!"
+                return response
+            else:
+                return f"❌ Failed to extract {info_type} from document `{doc_id}`."
+        
+        elif query_type == "get_document_metadata":
+            metadata = data.get("metadata")
+            doc_id = data.get("doc_id")
+            
+            if metadata:
+                response = f"ℹ️ **Document Metadata** (ID: `{doc_id}`)\n\n"
+                response += f"📝 **Name**: {metadata.get('custom_name')}\n"
+                response += f"📁 **File**: {metadata.get('original_filename')}\n"
+                response += f"📊 **Size**: {metadata.get('file_size', 0) / 1024:.1f} KB\n"
+                response += f"📄 **Type**: {metadata.get('file_type')}\n"
+                response += f"🧩 **Chunks**: {metadata.get('num_chunks')}\n"
+                response += f"🔤 **Characters**: {metadata.get('total_characters', 0):,}\n"
+                response += f"📅 **Uploaded**: {metadata.get('upload_date', '').split('T')[0]}\n"
+                return response
+            else:
+                return f"❌ Document `{doc_id}` not found."
+        
+        elif query_type == "get_storage_stats":
+            stats = data.get("stats", {})
+            
+            response = f"📊 **Document Storage Statistics**\n\n"
+            response += f"📄 **Total Documents**: {stats.get('total_documents', 0)}\n"
+            response += f"💾 **Storage Used**: {stats.get('total_size_mb', 0):.1f} MB\n"
+            response += f"🧩 **Total Chunks**: {stats.get('total_chunks', 0)}\n"
+            response += f"📈 **Avg Chunks/Doc**: {stats.get('avg_chunks_per_doc', 0)}\n\n"
+            
+            file_types = stats.get('file_types', {})
+            if file_types:
+                response += "📁 **File Types**:\n"
+                for file_type, count in file_types.items():
+                    emoji = {"pdf": "📄", "docx": "📝", "txt": "📋", "md": "📖"}.get(file_type.lstrip('.'), "📄")
+                    response += f"  {emoji} {file_type}: {count} files\n"
+            
+            return response
+        
+        return "📄 Document RAG data processed."
+    
     def format_github_response(self, data: Dict[str, Any], query_type: str) -> str:
         """Format GitHub data into a natural language response."""
         if query_type == "get_prs_to_review":
